@@ -39,17 +39,19 @@ class MultiSourceOTDAClassifier:
         else:
             self.ot_method.fit(Xs=Xs, ys=ys, Xt=Xt)
 
-        self.transp_Xs = self.ot_method.transform(Xs=Xs)
+
         if self.train_on_bary:
+            self.transp_Xs = self.ot_method.transform(Xs=Xt) # target -> barycenter
             X, y = self.ot_method.Xbar, self.ot_method.ybar
         else:
+            self.transp_Xs = self.ot_method.transform(Xs=Xs)
             X, y = self.transp_Xs, np.concatenate(ys, axis=0)
         self.clf.fit(X, y)
 
         return self
 
     def predict(self, Xs, Xt):
-        _Xs_ts = self.ot_method.transform(Xs=Xs)
+        # _Xs_ts = self.ot_method.transform(Xs=Xs)
 
         yp = self.clf.predict(Xt)
 

@@ -144,7 +144,7 @@ class MBTTransport:
 
 
     def transform(self, Xs=None, ys=None, Xt=None, yt=None):
-        self.txs_ = self.Tbt.transform(Xs=self.Xs)
+        self.txs_ = self.Tbt.transform(Xs=Xs)
         return self.txs_
 
 
