@@ -5,7 +5,7 @@ import json
 import warnings
 import argparse
 import numpy as np
-
+import tensorflow as tf
 from models import KerasMLP
 from functools import partial
 from sklearn.metrics import accuracy_score
@@ -22,13 +22,24 @@ from msda.barycenters import sinkhorn_barycenter
 
 from ot.da import SinkhornTransport
 from ot.da import SinkhornL1l2Transport
+import random
+import torch
+
+seed = 42
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(seed)
+tf.random.set_seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
 
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', default="Objects", type=str,
                     help="""available tasks: MGR, MSD, Objects, Faces""")
-parser.add_argument('--algorithm', default="WBT", type=str,
+parser.add_argument('--algorithm', default="WBT_reg", type=str,
                     help="""Select between WBT, SinT, JCPOT, KMM or TCA""")
 parser.add_argument('--data_path', default="./data/", type=str,
                     help="""Path to folder containing the data files""")

@@ -32,8 +32,8 @@ def sinkhorn_gpu(a, b, M, reg, numItermax=1000, stopThr=1e-9,
     log : dict
         dictionary containing error info and dual solution. Only returned if log=True.
     """
-    if (not torch.cuda.is_available()) and 'cuda' in device:
-        raise ValueError("Tried to use cuda device, but cuda is not available.")
+    #if (not torch.cuda.is_available()) and 'cuda' in device:
+    #    raise ValueError("Tried to use cuda device, but cuda is not available.")
     if log: logs = {'err': []}
     if verbose: print("|{:^25}|{:^25}|".format('It', 'Err'))
     if verbose: print("-" * (26 * 2 + 1))

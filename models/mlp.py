@@ -1,6 +1,6 @@
 import tensorflow as tf
 from sklearn.preprocessing import OneHotEncoder
-
+import tensorflow.python.keras.backend as K
 
 class KerasMLP:
     def __init__(self, lr, l2_penalty, n_epochs=50, input_shape=(4096,), n_classes=10, verbose=0):
@@ -14,12 +14,11 @@ class KerasMLP:
         self.build_model()
 
     def reset_weights(self):
-        session = tf.keras.backend.get_session()
         for layer in self.model.layers:
-            if hasattr(layer, 'kernel_initializer'):
-                layer.kernel.initializer.run(session=session)
-            if hasattr(layer, 'bias_initializer'):
-                layer.bias.initializer.run(session=session)
+            if hasattr(layer, 'kernel_initializer') and layer.kernel is not None:
+                layer.kernel.assign(layer.kernel_initializer(tf.shape(layer.kernel)))
+            if hasattr(layer, 'bias_initializer') and layer.bias is not None:
+                layer.bias.assign(layer.bias_initializer(tf.shape(layer.bias)))
 
     def build_model(self):
         if self.l2_penalty > 0:
@@ -55,7 +54,7 @@ class KerasMLP:
             self.reset_weights()
         _ytr = ytr.copy()
         if ytr.ndim < 2 or ytr.shape[1] != self.n_classes:
-            onehot_encoder = OneHotEncoder(sparse=False)
+            onehot_encoder = OneHotEncoder(sparse_output=False)
             _ytr = onehot_encoder.fit_transform(_ytr.reshape(-1, 1))
         if sample_weight is not None:
             self.model.fit(x=Xtr,

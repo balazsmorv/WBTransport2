@@ -256,7 +256,7 @@ class SinkhornLaplaceTransport(BaseTransport):
                  norm=None, similarity="knn", similarity_param=None, alpha=0.5,
                  max_iter=100, tol=1e-9, max_inner_iter=1000, inner_tol=1e-9,
                  log=False, verbose=False, distribution_estimation=distribution_estimation_uniform,
-                 limit_max=np.infty, out_of_sample_map='ferradans'):
+                 limit_max=np.inf, out_of_sample_map='ferradans'):
         self.reg = reg_type
         self.reg_e = reg_e
         self.reg_lap = reg_lap

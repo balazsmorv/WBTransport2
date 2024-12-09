@@ -12,8 +12,8 @@ from msda.ot_gpu import sinkhorn_gpu
 def sinkhorn_barycenter(mu_s, Xs, Xbar, ys=None, ybar=None, reg=1e-3, b=None, weights=None,
                         method="sinkhorn", norm="max", metric="sqeuclidean", numItermax=100,
                         numInnerItermax=1000, stopThr=1e-4, verbose=False, innerVerbose=False,
-                        log=False, line_search=False, limit_max=np.infty, callbacks=None,
-                        implementation='torch', device='cuda:0', **kwargs):
+                        log=False, line_search=False, limit_max=np.inf, callbacks=None,
+                        implementation='torch', device='cpu', **kwargs):
     r"""Compute the entropic regularized Wasserstein barycenter of distributions
     in :math:`\mu_{s}`. This function solves the follwing optimization problem:
 

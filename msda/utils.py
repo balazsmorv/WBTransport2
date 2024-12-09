@@ -40,7 +40,7 @@ def bar_random_cls_initializer(Xs, ys):
     return Xbar, ys
 
 
-def semisupervised_penalty(ys, yt, M, limit_max=np.infty):
+def semisupervised_penalty(ys, yt, M, limit_max=np.inf):
     r"""Adds the semisupervised penalty defined in [1]_, and given by the following equation:
 
     .. math::
