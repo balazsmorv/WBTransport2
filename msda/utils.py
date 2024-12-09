@@ -1,5 +1,5 @@
 import numpy as np
-
+import ot
 
 def bar_zeros_initializer(Xs, ys):
     r"""Initializes the barycenter support as zeros.
@@ -139,7 +139,7 @@ def ferradans_mapping(Xs_tr, Xs_ts, Xt, coupling, batch_size=32, interpolation="
     # Transport Xs onto Xt
     transp_Xs = barycentric_mapping(Xt=Xt, coupling=coupling)
     for bi in batch_ind:
-        D0 = dist(Xs_ts[bi], Xs_tr)
+        D0 = ot.dist(Xs_ts[bi], Xs_tr)
         idx = np.argmin(D0, axis=1)
 
         if interpolation == "diff":

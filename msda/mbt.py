@@ -2,17 +2,17 @@ import numpy as np
 
 from ot.utils import unif
 from ot.da import SinkhornTransport
-
 from msda.barycenters import sinkhorn_barycenter
+import matplotlib.pyplot as plt
 
 from msda.utils import ferradans_mapping
 from msda.utils import barycentric_mapping
 from msda.utils import bar_zeros_initializer
 from msda.utils import bar_random_initializer
 from msda.utils import bar_random_cls_initializer
+from msda.mapping import MappingTransport
 
-
-class WassersteinBarycenterTransport:
+class MBTTransport:
     r"""Multi-source domain adaptation using Wasserstein barycenters. This class is intended
     to solve the domain adaptation problem when one has multiple sources s1, ..., sM. First,
     the Wasserstein barycenter of source measures :math:`\{\mu_{k}\}_{k=1}^{N}` is estimated,
@@ -50,16 +50,24 @@ class WassersteinBarycenterTransport:
     """
 
     def __init__(self,
-                 barycenter_initialization="zeros",
-                 weights=None,
-                 verbose=False,
-                 barycenter_solver=sinkhorn_barycenter,
-                 transport_solver=SinkhornTransport):
+                 barycenter_initialization="zeros", weights=None, verbose=False, barycenter_solver=sinkhorn_barycenter,
+                 mu=1.0, eta=1e-3, bias=True, class_reg=False, kernel = 'linear', sigma = 1.0, max_iter=100,
+                 max_inner_iter = 1000, tol=1e-5, inner_tol=1e-6, log=True):
         self.barycenter_initialization = barycenter_initialization
         self.weights = None
         self.verbose = verbose
         self.barycenter_solver = barycenter_solver
-        self.transport_solver = transport_solver
+        self.mu = mu
+        self.eta = eta
+        self.sigma = sigma
+        self.max_iter = max_iter
+        self.max_inner_iter = max_inner_iter
+        self.class_reg = class_reg
+        self.kernel = kernel
+        self.bias = bias
+        self.tol = tol
+        self.log = log
+        self.inner_tol = inner_tol
 
     def fit(self, Xs=None, Xt=None, ys=None, yt=None):
         r"""Estimates the coupling matrices between each source domain and the barycenter.
@@ -123,33 +131,23 @@ class WassersteinBarycenterTransport:
         self.Xs = bary.copy()
 
         # Transport estimation
-        self.Tbt = self.transport_solver()
+        self.Tbt = MappingTransport(mu=self.mu, eta=self.eta, bias=self.bias, kernel=self.kernel, sigma=self.sigma, max_iter=self.max_iter, tol=self.tol, max_inner_iter=self.max_inner_iter, inner_tol=self.inner_tol, log=self.log, verbose=self.verbose, class_reg=self.class_reg)
         if self.verbose:
             print("\n")
-            print("Estimating transport Barycenter => Target")
+            print("Estimating transport Target => Barycenter")
             print("-----------------------------------------")
-        self.Tbt.fit(Xs=self.Xs, ys=self.ybar, Xt=Xt, yt=yt)
+        self.Tbt.fit(Xs=Xt, ys=yt, Xt=self.Xs, yt=self.ybar)
 
         self.coupling_["Bar->Target Coupling"] = self.Tbt.coupling_
+        self.mapping_ = self.Tbt.mapping_
+        self.log_ = self.Tbt.log_
+
 
     def transform(self, Xs=None, ys=None, Xt=None, yt=None):
-        # Verify if samples given were the ones used to fit the optimal transport plan
-        if all([np.array_equal(xs_k, Xs_k) for xs_k, Xs_k in zip(self.xs_, Xs)]):
-            # If they were the same, applies barycentric mapping
-            self.txs_ = self.Tbt.transform(Xs=self.Xs)
-        else:
-            # Otherwise, uses Ferradans mapping
-            _Xs = []
-            for Xs_ts_k, Xs_tr_k, gamma_k in zip(Xs, self.xs_, self.coupling_):
-                # 1. Transport each medium to the barycenter using Ferradans mapping
-                # For each xj in Xs_ts Finds nearest neighbor in Xs_ts and applies
-                # the barycentric mapping
-                _Xs.append(
-                    ferradans_mapping(Xs_tr=Xs_tr_k,
-                                      Xs_ts=Xs_ts_k,
-                                      Xt=self.Xbar,
-                                      coupling=self.coupling_[gamma_k])
-                )
-            # 2. Using the transported points onto the barycenter, transport them onto the target.
-            self.txs_ = np.concatenate(_Xs, axis=0)
+        self.txs_ = self.Tbt.transform(Xs=self.Xs)
         return self.txs_
+
+
+    def plot_loss(self):
+        plt.plot([l.cpu() for l in self.log_["loss"]])
+        plt.show()

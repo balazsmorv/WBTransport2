@@ -2,10 +2,11 @@ import numpy as np
 
 
 class MultiSourceOTDAClassifier:
-    def __init__(self, clf, ot_method, semi_supervised=False):
+    def __init__(self, clf, ot_method, semi_supervised=False, train_on_bary=False):
         self.clf = clf
         self.ot_method = ot_method
         self.semi_supervised = semi_supervised
+        self.train_on_bary = train_on_bary
 
     def fit(self, Xs, ys, Xt=None, yt=None):
         """Fits two objects on data (Xs, ys, Xt, yt):
@@ -39,7 +40,10 @@ class MultiSourceOTDAClassifier:
             self.ot_method.fit(Xs=Xs, ys=ys, Xt=Xt)
 
         self.transp_Xs = self.ot_method.transform(Xs=Xs)
-        X, y = self.transp_Xs, np.concatenate(ys, axis=0)
+        if self.train_on_bary:
+            X, y = self.ot_method.Xbar, self.ot_method.ybar
+        else:
+            X, y = self.transp_Xs, np.concatenate(ys, axis=0)
         self.clf.fit(X, y)
 
         return self

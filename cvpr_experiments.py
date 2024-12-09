@@ -19,6 +19,7 @@ from msda import TransferComponentsClassifier
 from msda import ImportanceWeightedClassifier
 from msda import WassersteinBarycenterTransport
 from msda.barycenters import sinkhorn_barycenter
+from msda.mbt import MBTTransport
 
 from ot.da import SinkhornTransport
 from ot.da import SinkhornL1l2Transport
@@ -39,8 +40,8 @@ warnings.filterwarnings("ignore")
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', default="Objects", type=str,
                     help="""available tasks: MGR, MSD, Objects, Faces""")
-parser.add_argument('--algorithm', default="WBT_reg", type=str,
-                    help="""Select between WBT, SinT, JCPOT, KMM or TCA""")
+parser.add_argument('--algorithm', default="MBT", type=str,
+                    help="""Select between WBT, WBT_reg, MBT, SinT, JCPOT, KMM or TCA""")
 parser.add_argument('--data_path', default="./data/", type=str,
                     help="""Path to folder containing the data files""")
 parser.add_argument('--numItermax',
@@ -89,6 +90,11 @@ elif algorithm == 'TCA':
     algorithm_params = {'n_components': n_components, 'mu': mu}
 elif algorithm == 'KMM':
     algorithm_params = {}
+elif algorithm == 'MBT':
+    algorithm_params = {'numItermax': numItermax,
+                        'reg_e_bar': reg_e_bar,
+                        'reg_e': reg_e,
+                        'reg_cl': reg_cl}
 
 print('Chosen algorithm: {}\n Parameters: {}'.format(algorithm, algorithm_params))
 
@@ -204,6 +210,21 @@ for target in targets:
             model.fit(Xs=Xs, ys=ys, Xt=Xt, yt=yt)
             yp = model.predict(Xs=Xs, Xt=Xt)
             yp = yp[:len(yt)] # get only predictions on test samples
+
+        elif algorithm == 'MBT':
+            yb = np.concatenate(ys, axis=0)
+            barycenter_solver = partial(sinkhorn_barycenter, numItermax=numItermax, reg=reg_e_bar, limit_max=1e+3,
+                                        stopThr=1,
+                                        ys=ys, ybar=yb, verbose=False)
+
+            baryT = MBTTransport(barycenter_solver=barycenter_solver, barycenter_initialization="random_cls", mu=1.0,
+                                 eta=1e-3, bias=True, class_reg=False, kernel = 'linear', sigma = 1.0, max_iter=100,
+                                max_inner_iter = 1000, tol=1e-5, inner_tol=1e-6, log=True)
+            model = MultiSourceOTDAClassifier(clf=clf, ot_method=baryT, semi_supervised=False, train_on_bary=True)
+            model.fit(Xs=Xs, ys=ys, Xt=Xt, yt=yt)
+            yp = model.predict(Xs=Xs, Xt=Xt)
+            yp = yp[:len(yt)]  # get only predictions on test samples
+
         elif algorithm == 'SinT':
             if reg_cl > 0.0:
                 T = msda.SinkhornLaplaceTransport(reg_e=reg_e, reg_lap=reg_cl, similarity_param=80, norm='max')
