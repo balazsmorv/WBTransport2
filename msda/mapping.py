@@ -380,8 +380,6 @@ def joint_OT_mapping_linear(
 
     def loss(L, G):
         """Compute full loss"""
-        # Ötlet 1: If the coupling mtx assigns weight to non-matching class target sample, penalize
-        # Ha valamilyen thresholdnál több masst akarna rossz labelű mintába vinni akkor penalty
         return (
             nx.sum((nx.dot(xs1, L) - ns * nx.dot(G, xt)) ** 2)
             + mu * nx.sum(G * M)

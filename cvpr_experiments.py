@@ -19,7 +19,7 @@ from msda import TransferComponentsClassifier
 from msda import ImportanceWeightedClassifier
 from msda import WassersteinBarycenterTransport
 from msda.barycenters import sinkhorn_barycenter
-from msda.mbt import MBTTransport
+from msda.bmt import BMTTransport
 
 from ot.da import SinkhornTransport
 from ot.da import SinkhornL1l2Transport
@@ -40,8 +40,8 @@ warnings.filterwarnings("ignore")
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', default="Objects", type=str,
                     help="""available tasks: MGR, MSD, Objects, Faces""")
-parser.add_argument('--algorithm', default="MBT", type=str,
-                    help="""Select between WBT, WBT_reg, MBT, SinT, JCPOT, KMM or TCA""")
+parser.add_argument('--algorithm', default="BMT_newsamples", type=str,
+                    help="""Select between WBT, WBT_reg, BMT, SinT, JCPOT, KMM or TCA""")
 parser.add_argument('--data_path', default="./data/", type=str,
                     help="""Path to folder containing the data files""")
 parser.add_argument('--numItermax',
@@ -90,11 +90,15 @@ elif algorithm == 'TCA':
     algorithm_params = {'n_components': n_components, 'mu': mu}
 elif algorithm == 'KMM':
     algorithm_params = {}
-elif algorithm == 'MBT':
+elif algorithm == 'BMT' or algorithm == 'BMT_newsamples':
     algorithm_params = {'numItermax': numItermax,
                         'reg_e_bar': reg_e_bar,
                         'reg_e': reg_e,
                         'reg_cl': reg_cl}
+if algorithm == 'BMT_newsamples' or algorithm == 'WBT_reg_newsamples':
+    algorithm_params["new_samples_ratio"] = 0.2
+else:
+    algorithm_params["new_samples_ratio"] = None
 
 print('Chosen algorithm: {}\n Parameters: {}'.format(algorithm, algorithm_params))
 
@@ -147,7 +151,6 @@ if task == "MGR" or task == "MSD":
 else:
     targets = domains
 
-
 print('\n\n')
 print('-' * 79)
 print('|{:^77}|'.format(algorithm))
@@ -178,6 +181,20 @@ for target in targets:
 
         Xt = X[indt]
         yt = y[indt]
+
+        if algorithm_params["new_samples_ratio"] is not None:
+            split_idx = int(Xt.shape[0] * (1-algorithm_params["new_samples_ratio"]))
+            print(f'Known split: {split_idx}, new split: {Xt.shape[0] - split_idx}')
+
+            permutation = np.random.permutation(len(yt))
+            Xt = Xt[permutation]
+            yt = yt[permutation]
+
+            Xt_new = Xt[split_idx:]
+            yt_new = yt[split_idx:]
+
+            Xt = Xt[:split_idx]
+            yt = yt[:split_idx]
 
         # Selects the algorithm for performing MSDA
         if algorithm == 'WBT':
@@ -211,19 +228,51 @@ for target in targets:
             yp = model.predict(Xs=Xs, Xt=Xt)
             yp = yp[:len(yt)] # get only predictions on test samples
 
-        elif algorithm == 'MBT':
+        elif algorithm == 'WBT_reg_newsamples':
+            yb = np.concatenate(ys, axis=0)
+            barycenter_solver = partial(sinkhorn_barycenter, numItermax=numItermax, reg=reg_e_bar, limit_max=1e+3,
+                                        stopThr=1,
+                                        ys=ys, ybar=yb, verbose=False)
+            if reg_cl > 0.0:
+                transport_solver = partial(SinkhornL1l2Transport, reg_e=reg_e, reg_cl=reg_cl, norm='max')
+            else:
+                transport_solver = partial(SinkhornTransport, reg_e=reg_e, norm='max')
+
+            baryT = msda.WassersteinBarycenterTransport(barycenter_solver=barycenter_solver,
+                                                        transport_solver=transport_solver,
+                                                        barycenter_initialization="random_cls")
+            model = MultiSourceOTDAClassifier(clf=clf, ot_method=baryT, semi_supervised=False)
+            model.fit(Xs=Xs, ys=ys, Xt=Xt, yt=yt)
+            yp = model.predict(Xs=Xs, Xt=Xt_new)
+            yp = yp[:len(yt_new)]  # get only predictions on test samples
+
+        elif algorithm == 'BMT':
             yb = np.concatenate(ys, axis=0)
             barycenter_solver = partial(sinkhorn_barycenter, numItermax=numItermax, reg=reg_e_bar, limit_max=1e+3,
                                         stopThr=1,
                                         ys=ys, ybar=yb, verbose=False)
 
-            baryT = MBTTransport(barycenter_solver=barycenter_solver, barycenter_initialization="random_cls", mu=1.0,
-                                 eta=1e-3, bias=True, class_reg=False, kernel = 'linear', sigma = 1.0, max_iter=100,
-                                max_inner_iter = 1000, tol=1e-5, inner_tol=1e-6, log=True)
+            baryT = BMTTransport(barycenter_solver=barycenter_solver, barycenter_initialization="random_cls", mu=1e-2,
+                                 eta=1e-4, bias=True, class_reg=False, kernel = 'gaussian', sigma = 1.0, max_iter=100,
+                                 max_inner_iter = 1000, tol=1e-5, inner_tol=1e-6, log=True, verbose=True)
             model = MultiSourceOTDAClassifier(clf=clf, ot_method=baryT, semi_supervised=False, train_on_bary=True)
             model.fit(Xs=Xs, ys=ys, Xt=Xt, yt=yt)
             yp = model.predict(Xs=Xs, Xt=Xt)
             yp = yp[:len(yt)]  # get only predictions on test samples
+
+        elif algorithm == 'BMT_newsamples':
+            yb = np.concatenate(ys, axis=0)
+            barycenter_solver = partial(sinkhorn_barycenter, numItermax=numItermax, reg=reg_e_bar, limit_max=1e+3,
+                                        stopThr=1,
+                                        ys=ys, ybar=yb, verbose=False)
+
+            baryT = BMTTransport(barycenter_solver=barycenter_solver, barycenter_initialization="random_cls", mu=3.0,
+                                 eta=1e-3, bias=True, class_reg=False, kernel = 'linear', sigma = 1.0, max_iter=100,
+                                 max_inner_iter = 1000, tol=1e-5, inner_tol=1e-6, log=True, verbose=True)
+            model = MultiSourceOTDAClassifier(clf=clf, ot_method=baryT, semi_supervised=False, train_on_bary=True)
+            model.fit(Xs=Xs, ys=ys, Xt=Xt, yt=yt)
+            yp = model.predict(Xs=Xs, Xt=Xt_new)
+            yp = yp[:len(yt_new)]  # get only predictions on test samples
 
         elif algorithm == 'SinT':
             if reg_cl > 0.0:
@@ -269,7 +318,10 @@ for target in targets:
                 clf_pca = DAPrincipalComponentAnalysis(clf=clf, num_components=n_components,)
             clf_pca.fit(cXs, cys, Xt)
             yp = clf_pca.predict(Xt)
-        acc = 100 * accuracy_score(yt, yp)
+        if algorithm == "WBT_reg_newsamples" or algorithm == "BMT_newsamples":
+            acc = 100 * accuracy_score(yt_new, yp)
+        else:
+            acc = 100 * accuracy_score(yt, yp)
         accs.append(acc)
         print('|{:^25}|{:^25}|{:^25}|'.format(domain_names[target], acc, i))    
     print('|{:^25}|{:^25}|{:^25}|'.format(domain_names[target], np.mean(accs), np.std(accs)))

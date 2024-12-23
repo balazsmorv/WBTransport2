@@ -12,7 +12,7 @@ from msda.utils import bar_random_initializer
 from msda.utils import bar_random_cls_initializer
 from msda.mapping import MappingTransport
 
-class MBTTransport:
+class BMTTransport:
     r"""Multi-source domain adaptation using Wasserstein barycenters. This class is intended
     to solve the domain adaptation problem when one has multiple sources s1, ..., sM. First,
     the Wasserstein barycenter of source measures :math:`\{\mu_{k}\}_{k=1}^{N}` is estimated,
@@ -131,12 +131,15 @@ class MBTTransport:
         self.Xs = bary.copy()
 
         # Transport estimation
-        self.Tbt = MappingTransport(mu=self.mu, eta=self.eta, bias=self.bias, kernel=self.kernel, sigma=self.sigma, max_iter=self.max_iter, tol=self.tol, max_inner_iter=self.max_inner_iter, inner_tol=self.inner_tol, log=self.log, verbose=self.verbose, class_reg=self.class_reg)
+        self.Tbt = MappingTransport(mu=self.mu, eta=self.eta, bias=self.bias, kernel=self.kernel, sigma=self.sigma,
+                                    max_iter=self.max_iter, tol=self.tol, max_inner_iter=self.max_inner_iter,
+                                    inner_tol=self.inner_tol, log=self.log, verbose=self.verbose,
+                                    class_reg=self.class_reg, verbose2=self.verbose)
         if self.verbose:
             print("\n")
             print("Estimating transport Target => Barycenter")
             print("-----------------------------------------")
-        self.Tbt.fit(Xs=Xt, ys=yt, Xt=self.Xs, yt=self.ybar)
+        self.Tbt.fit(Xs=self.xt_, ys=yt, Xt=bary, yt=self.ybar)
 
         self.coupling_["Bar->Target Coupling"] = self.Tbt.coupling_
         self.mapping_ = self.Tbt.mapping_
